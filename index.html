@@ -1,0 +1,1584 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Můj Svět – Restaurant & Coffee</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --cream: #f5f0e8;
+    --warm-white: #faf7f2;
+    --bark: #5a3e2b;
+    --dark-bark: #3a2518;
+    --moss: #6b7c5c;
+    --sage: #8a9b7a;
+    --gold: #c8a96e;
+    --light-gold: #e8d5a3;
+    --charcoal: #2c2420;
+    --rust: #9b5e3a;
+    --text-body: #3d2e22;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Jost', sans-serif;
+    background: var(--warm-white);
+    color: var(--text-body);
+    overflow-x: hidden;
+  }
+
+  /* ========== LOADER ========== */
+  #loader {
+    position: fixed; inset: 0;
+    background: var(--dark-bark);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999;
+    transition: opacity 0.8s ease, visibility 0.8s ease;
+  }
+  #loader.hidden { opacity: 0; visibility: hidden; }
+  .loader-text {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2rem, 6vw, 4rem);
+    color: var(--gold);
+    letter-spacing: 0.2em;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+
+  /* ========== NAVBAR ========== */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 100;
+    padding: 1.2rem 2.5rem;
+    display: flex; align-items: center; justify-content: space-between;
+    transition: background 0.5s ease, box-shadow 0.5s ease;
+  }
+  nav.scrolled {
+    background: rgba(58, 37, 24, 0.97);
+    box-shadow: 0 2px 30px rgba(0,0,0,0.3);
+    backdrop-filter: blur(10px);
+  }
+  .nav-logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.5rem;
+    color: var(--gold);
+    text-decoration: none;
+    letter-spacing: 0.05em;
+  }
+  .nav-logo span { font-style: italic; }
+  .nav-links {
+    display: flex; gap: 2.5rem;
+    list-style: none;
+  }
+  .nav-links a {
+    color: var(--cream);
+    text-decoration: none;
+    font-size: 0.85rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    font-weight: 400;
+    transition: color 0.3s;
+    position: relative;
+  }
+  .nav-links a::after {
+    content: '';
+    position: absolute; bottom: -4px; left: 0; right: 0;
+    height: 1px;
+    background: var(--gold);
+    transform: scaleX(0);
+    transition: transform 0.3s ease;
+  }
+  .nav-links a:hover { color: var(--gold); }
+  .nav-links a:hover::after { transform: scaleX(1); }
+
+  .hamburger {
+    display: none;
+    flex-direction: column; gap: 5px; cursor: pointer; padding: 4px;
+  }
+  .hamburger span {
+    width: 26px; height: 2px;
+    background: var(--gold);
+    transition: all 0.3s;
+    display: block;
+  }
+  .hamburger.active span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  .hamburger.active span:nth-child(2) { opacity: 0; }
+  .hamburger.active span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+  .mobile-menu {
+    display: none;
+    position: fixed; inset: 0;
+    background: var(--dark-bark);
+    z-index: 99;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2.5rem;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  .mobile-menu.open { opacity: 1; }
+  .mobile-menu a {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    color: var(--cream);
+    text-decoration: none;
+    letter-spacing: 0.05em;
+    transition: color 0.3s;
+  }
+  .mobile-menu a:hover { color: var(--gold); }
+
+  /* ========== HERO ========== */
+  .hero {
+    position: relative;
+    height: 100svh;
+    min-height: 600px;
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .hero-bg {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse at 30% 40%, rgba(107,124,92,0.15) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 70%, rgba(90,62,43,0.2) 0%, transparent 50%),
+      url('https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1800&q=80') center/cover no-repeat;
+    transform: scale(1.05);
+    transition: transform 0.1s linear;
+  }
+  .hero-overlay {
+    position: absolute; inset: 0;
+    background: linear-gradient(
+      160deg,
+      rgba(30,18,10,0.75) 0%,
+      rgba(58,37,24,0.55) 50%,
+      rgba(20,12,6,0.8) 100%
+    );
+  }
+  .hero-content {
+    position: relative; z-index: 2;
+    text-align: center;
+    padding: 1rem;
+    animation: fadeUp 1.2s ease forwards;
+    opacity: 0;
+    animation-delay: 0.3s;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .hero-tag {
+    font-family: 'Jost', sans-serif;
+    font-size: 0.8rem;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 1.2rem;
+    display: block;
+  }
+  .hero-title {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(3.5rem, 10vw, 7rem);
+    color: var(--cream);
+    line-height: 1;
+    margin-bottom: 0.3rem;
+  }
+  .hero-title em {
+    font-style: italic;
+    color: var(--light-gold);
+  }
+  .hero-subtitle {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(1rem, 2.5vw, 1.4rem);
+    color: rgba(245,240,232,0.75);
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    margin-bottom: 2.5rem;
+    font-weight: 300;
+  }
+  .hero-divider {
+    width: 60px; height: 1px;
+    background: var(--gold);
+    margin: 0 auto 2.5rem;
+  }
+  .hero-cta {
+    display: inline-flex; align-items: center; gap: 0.8rem;
+    background: transparent;
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    padding: 1rem 2.5rem;
+    font-family: 'Jost', sans-serif;
+    font-size: 0.85rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.4s, color 0.4s;
+    margin: 0 0.5rem 0.8rem;
+  }
+  .hero-cta:hover {
+    background: var(--gold);
+    color: var(--dark-bark);
+  }
+  .hero-cta.filled {
+    background: var(--gold);
+    color: var(--dark-bark);
+    border-color: var(--gold);
+  }
+  .hero-cta.filled:hover {
+    background: transparent;
+    color: var(--gold);
+  }
+  .hero-scroll {
+    position: absolute; bottom: 2rem; left: 50%; transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+    color: rgba(245,240,232,0.5);
+    font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase;
+    z-index: 2;
+    animation: fadeUp 1.5s ease forwards;
+    opacity: 0;
+    animation-delay: 1.2s;
+  }
+  .scroll-line {
+    width: 1px; height: 50px;
+    background: linear-gradient(to bottom, var(--gold), transparent);
+    animation: scrollPulse 2s ease-in-out infinite;
+  }
+  @keyframes scrollPulse { 0%,100%{opacity:0.3;transform:scaleY(0.7)} 50%{opacity:1;transform:scaleY(1)} }
+
+  /* ========== SECTION BASE ========== */
+  section { padding: 5rem 1.5rem; }
+  .container { max-width: 1100px; margin: 0 auto; }
+  .section-tag {
+    font-size: 0.75rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--moss);
+    display: block;
+    margin-bottom: 0.8rem;
+  }
+  .section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    color: var(--dark-bark);
+    line-height: 1.1;
+    margin-bottom: 1.5rem;
+  }
+  .section-title em { font-style: italic; color: var(--rust); }
+  .divider-line {
+    width: 50px; height: 2px;
+    background: var(--gold);
+    margin-bottom: 2rem;
+  }
+
+  /* ========== ABOUT ========== */
+  .about { background: var(--warm-white); }
+  .about-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5rem;
+    align-items: center;
+  }
+  .about-image-wrap {
+    position: relative;
+  }
+  .about-img {
+    width: 100%;
+    aspect-ratio: 4/5;
+    object-fit: cover;
+    display: block;
+  }
+  .about-img-accent {
+    position: absolute;
+    top: -20px; right: -20px;
+    width: 60%; height: 60%;
+    border: 2px solid var(--gold);
+    z-index: -1;
+  }
+  .about-text p {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.2rem;
+    line-height: 1.8;
+    color: var(--text-body);
+    margin-bottom: 1.5rem;
+    font-weight: 300;
+  }
+  .about-stats {
+    display: flex; gap: 2.5rem; margin-top: 2.5rem;
+    padding-top: 2rem;
+    border-top: 1px solid rgba(90,62,43,0.15);
+  }
+  .stat-item { text-align: center; }
+  .stat-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.2rem;
+    color: var(--gold);
+    display: block;
+  }
+  .stat-label {
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--moss);
+  }
+
+  /* ========== FEATURES ========== */
+  .features {
+    background: var(--dark-bark);
+    padding: 5rem 1.5rem;
+  }
+  .features .section-title { color: var(--cream); }
+  .features .section-tag { color: var(--sage); }
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    margin-top: 3rem;
+  }
+  .feature-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(200,169,110,0.15);
+    padding: 2.5rem 2rem;
+    transition: background 0.4s, border-color 0.4s;
+    position: relative; overflow: hidden;
+  }
+  .feature-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0;
+    width: 3px; height: 0;
+    background: var(--gold);
+    transition: height 0.4s ease;
+  }
+  .feature-card:hover { background: rgba(200,169,110,0.05); border-color: rgba(200,169,110,0.35); }
+  .feature-card:hover::before { height: 100%; }
+  .feature-icon {
+    font-size: 2rem; margin-bottom: 1rem;
+    display: block;
+  }
+  .feature-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.3rem;
+    color: var(--light-gold);
+    margin-bottom: 0.8rem;
+  }
+  .feature-desc {
+    font-size: 0.9rem;
+    color: rgba(245,240,232,0.6);
+    line-height: 1.7;
+    font-weight: 300;
+  }
+
+  /* ========== MENU SECTION ========== */
+  .menu-section {
+    background: var(--cream);
+    padding: 5rem 1.5rem;
+    scroll-margin-top: 80px;
+  }
+  .menu-header { text-align: center; margin-bottom: 3.5rem; }
+  .menu-header .divider-line { margin: 0 auto 2rem; }
+  .menu-tabs {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem;
+    margin-bottom: 3rem;
+  }
+  .tab-btn {
+    background: none;
+    border: 1px solid rgba(90,62,43,0.25);
+    color: var(--text-body);
+    padding: 0.6rem 1.5rem;
+    font-family: 'Jost', sans-serif;
+    font-size: 0.8rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  .tab-btn.active, .tab-btn:hover {
+    background: var(--bark);
+    color: var(--cream);
+    border-color: var(--bark);
+  }
+  .menu-panel { display: none; }
+  .menu-panel.active { display: block; animation: fadeIn 0.4s ease; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+  .menu-category-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.6rem;
+    color: var(--dark-bark);
+    margin-bottom: 0.4rem;
+    padding-bottom: 0.8rem;
+    border-bottom: 1px solid rgba(90,62,43,0.2);
+    margin-bottom: 1.5rem;
+  }
+  .menu-category-title em { font-style: italic; color: var(--rust); }
+  .menu-items { margin-bottom: 2.5rem; }
+  .menu-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 0.9rem 0;
+    border-bottom: 1px solid rgba(90,62,43,0.08);
+    transition: background 0.2s;
+  }
+  .menu-item:hover { background: rgba(200,169,110,0.06); margin: 0 -1rem; padding: 0.9rem 1rem; }
+  .item-left { flex: 1; }
+  .item-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.1rem;
+    color: var(--dark-bark);
+    font-weight: 400;
+    display: block;
+  }
+  .item-desc {
+    font-size: 0.8rem;
+    color: var(--moss);
+    font-style: italic;
+    margin-top: 0.15rem;
+    display: block;
+    line-height: 1.4;
+  }
+  .item-price {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    color: var(--gold);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .menu-note {
+    font-size: 0.8rem;
+    color: var(--moss);
+    font-style: italic;
+    margin-top: -1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  /* ========== DAILY MENU ========== */
+  .daily-menu {
+    background: var(--dark-bark);
+    padding: 5rem 1.5rem;
+    scroll-margin-top: 80px;
+  }
+  .daily-menu .section-title { color: var(--cream); }
+  .daily-menu .section-tag { color: var(--sage); }
+  .daily-menu .divider-line { background: var(--gold); }
+
+  .daily-day-tabs {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    margin: 2rem 0;
+  }
+  .daily-day-btn {
+    background: transparent;
+    border: 1px solid rgba(200,169,110,0.2);
+    color: rgba(245,240,232,0.6);
+    padding: 0.55rem 1.3rem;
+    font-family: 'Jost', sans-serif;
+    font-size: 0.8rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.25s;
+    position: relative;
+  }
+  .daily-day-btn .meal-count-badge {
+    position: absolute; top: -6px; right: -6px;
+    background: var(--gold);
+    color: var(--dark-bark);
+    font-size: 0.6rem;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600;
+  }
+  .daily-day-btn.active {
+    background: var(--gold);
+    color: var(--dark-bark);
+    border-color: var(--gold);
+  }
+  .daily-day-btn:hover:not(.active) {
+    border-color: rgba(200,169,110,0.5);
+    color: var(--gold);
+  }
+  .daily-day-btn.empty { opacity: 0.35; cursor: default; }
+
+  .daily-panel { display: none; }
+  .daily-panel.active {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1px;
+    background: rgba(200,169,110,0.08);
+    border: 1px solid rgba(200,169,110,0.12);
+    animation: fadeIn 0.35s ease;
+  }
+
+  .daily-meal-card {
+    background: var(--dark-bark);
+    padding: 1.5rem;
+    transition: background 0.25s;
+    position: relative;
+  }
+  .daily-meal-card:hover { background: rgba(255,255,255,0.04); }
+  .daily-cat-tag {
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--moss);
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+  .daily-cat-tag.soup { color: #b5906a; }
+  .daily-cat-tag.main { color: var(--sage); }
+  .daily-cat-tag.dessert { color: #c8a9c8; }
+  .daily-cat-tag.veggie { color: #7daf6c; }
+  .daily-cat-tag.special { color: var(--gold); }
+
+  .daily-meal-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.15rem;
+    color: var(--cream);
+    display: block;
+    margin-bottom: 0.4rem;
+    line-height: 1.3;
+  }
+  .daily-meal-desc {
+    font-size: 0.82rem;
+    color: rgba(245,240,232,0.5);
+    font-style: italic;
+    line-height: 1.5;
+    display: block;
+    margin-bottom: 0.8rem;
+  }
+  .daily-meal-footer {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .daily-meal-price {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.2rem;
+    color: var(--gold);
+  }
+  .daily-meal-grams {
+    font-size: 0.75rem;
+    color: rgba(245,240,232,0.35);
+  }
+
+  .daily-empty {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(200,169,110,0.08);
+  }
+  .daily-empty-icon { font-size: 3rem; display: block; margin-bottom: 1rem; opacity: 0.3; }
+  .daily-empty-text { color: rgba(245,240,232,0.4); font-size: 1rem; font-family: 'Playfair Display', serif; font-style: italic; }
+
+  .daily-loading {
+    text-align: center; padding: 3rem;
+    color: rgba(245,240,232,0.4);
+    font-size: 0.9rem; letter-spacing: 0.1em;
+  }
+
+  /* ========== GALLERY ========== */
+  .gallery {
+    background: var(--warm-white);
+    padding: 5rem 1.5rem;
+  }
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: 250px 250px;
+    gap: 8px;
+    margin-top: 3rem;
+  }
+  .gallery-item {
+    overflow: hidden; position: relative;
+    background: var(--bark);
+  }
+  .gallery-item:first-child {
+    grid-column: span 2; grid-row: span 2;
+  }
+  .gallery-item img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    transition: transform 0.6s ease, filter 0.6s ease;
+    filter: brightness(0.9);
+  }
+  .gallery-item:hover img {
+    transform: scale(1.06);
+    filter: brightness(1);
+  }
+  .gallery-overlay {
+    position: absolute; inset: 0;
+    background: linear-gradient(to top, rgba(30,18,10,0.5) 0%, transparent 50%);
+    opacity: 0; transition: opacity 0.4s;
+  }
+  .gallery-item:hover .gallery-overlay { opacity: 1; }
+
+  /* ========== REVIEWS ========== */
+  .reviews {
+    background: var(--dark-bark);
+    padding: 5rem 1.5rem;
+  }
+  .reviews .section-title { color: var(--cream); }
+  .reviews .section-tag { color: var(--sage); }
+  .reviews-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-top: 3rem;
+  }
+  .review-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(200,169,110,0.12);
+    padding: 2rem;
+    transition: border-color 0.3s, background 0.3s;
+  }
+  .review-card:hover {
+    border-color: rgba(200,169,110,0.3);
+    background: rgba(255,255,255,0.07);
+  }
+  .stars { color: var(--gold); font-size: 1rem; margin-bottom: 1rem; letter-spacing: 0.1em; }
+  .review-text {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.05rem;
+    color: rgba(245,240,232,0.85);
+    line-height: 1.7;
+    font-style: italic;
+    margin-bottom: 1.2rem;
+  }
+  .review-author {
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--sage);
+  }
+  .review-rating-big {
+    text-align: center;
+    padding: 2rem;
+    border: 1px solid rgba(200,169,110,0.2);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .rating-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 4rem;
+    color: var(--gold);
+    line-height: 1;
+  }
+  .rating-label { color: rgba(245,240,232,0.5); font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 0.5rem; }
+
+  /* ========== INFO / CONTACT ========== */
+  .info-section {
+    background: var(--warm-white);
+    padding: 5rem 1.5rem;
+  }
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5rem;
+    align-items: start;
+  }
+  .info-block h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.8rem;
+    color: var(--dark-bark);
+    margin-bottom: 1.5rem;
+  }
+  .info-row {
+    display: flex; align-items: flex-start; gap: 1rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid rgba(90,62,43,0.1);
+  }
+  .info-icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 0.1rem; }
+  .info-row-text { font-size: 0.95rem; line-height: 1.6; color: var(--text-body); }
+  .info-row-label { font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--moss); margin-bottom: 0.3rem; }
+  .hours-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem 1rem; }
+  .hours-grid span { font-size: 0.9rem; }
+  .hours-day { color: var(--moss); font-weight: 400; }
+  .hours-time { color: var(--text-body); }
+  .map-embed {
+    border: 0; width: 100%; height: 320px;
+    border-radius: 2px;
+    margin-top: 1.5rem;
+    filter: sepia(20%) contrast(0.9);
+  }
+
+  /* ========== FOOTER ========== */
+  footer {
+    background: var(--charcoal);
+    padding: 3rem 1.5rem;
+    text-align: center;
+  }
+  .footer-logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    color: var(--gold);
+    margin-bottom: 0.5rem;
+    display: block;
+  }
+  .footer-sub {
+    font-size: 0.75rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: rgba(245,240,232,0.35);
+    margin-bottom: 1.5rem;
+  }
+  .footer-links {
+    display: flex; justify-content: center; gap: 2rem;
+    list-style: none; margin-bottom: 2rem;
+  }
+  .footer-links a {
+    color: rgba(245,240,232,0.5);
+    text-decoration: none;
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+    transition: color 0.3s;
+  }
+  .footer-links a:hover { color: var(--gold); }
+  .footer-copy {
+    font-size: 0.75rem;
+    color: rgba(245,240,232,0.25);
+  }
+
+  /* ========== RESPONSIVE ========== */
+  @media (max-width: 900px) {
+    .nav-links { display: none; }
+    .hamburger { display: flex; }
+    .mobile-menu { display: flex; }
+    .about-grid { grid-template-columns: 1fr; gap: 2.5rem; }
+    .about-img { aspect-ratio: 16/9; }
+    .about-img-accent { display: none; }
+    .features-grid { grid-template-columns: 1fr; }
+    .reviews-grid { grid-template-columns: 1fr; }
+    .info-grid { grid-template-columns: 1fr; gap: 2.5rem; }
+    .gallery-grid {
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: repeat(3, 200px);
+    }
+    .gallery-item:first-child { grid-column: span 2; grid-row: span 1; }
+  }
+  @media (max-width: 600px) {
+    nav { padding: 1rem 1.2rem; }
+    .hero-cta { padding: 0.85rem 1.8rem; font-size: 0.78rem; }
+    .about-stats { gap: 1.5rem; }
+    .gallery-grid { grid-template-columns: 1fr; grid-template-rows: unset; }
+    .gallery-item { height: 220px; }
+    .gallery-item:first-child { grid-column: auto; grid-row: auto; height: 280px; }
+    .menu-tabs { gap: 0.35rem; }
+    .tab-btn { padding: 0.5rem 1rem; font-size: 0.72rem; }
+    section { padding: 3.5rem 1.2rem; }
+  }
+
+  /* ========== REVEAL ANIMATION ========== */
+  .reveal {
+    opacity: 0; transform: translateY(25px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+  .reveal-delay-1 { transition-delay: 0.1s; }
+  .reveal-delay-2 { transition-delay: 0.2s; }
+  .reveal-delay-3 { transition-delay: 0.3s; }
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader"><span class="loader-text">Můj Svět</span></div>
+
+<!-- NAVBAR -->
+<nav id="navbar">
+  <a href="#hero" class="nav-logo"><span>Můj</span> Svět</a>
+  <ul class="nav-links">
+    <li><a href="#about">O nás</a></li>
+    <li><a href="#daily-menu">Denní menu</a></li>
+    <li><a href="#menu">Stálá nabídka</a></li>
+    <li><a href="#gallery">Galerie</a></li>
+    <li><a href="#reviews">Recenze</a></li>
+    <li><a href="#info">Kontakt</a></li>
+  </ul>
+  <div class="hamburger" id="hamburger" onclick="toggleMenu()">
+    <span></span><span></span><span></span>
+  </div>
+</nav>
+
+<!-- MOBILE MENU -->
+<div class="mobile-menu" id="mobileMenu">
+  <a href="#about" onclick="toggleMenu()">O nás</a>
+  <a href="#daily-menu" onclick="toggleMenu()">Denní menu</a>
+  <a href="#menu" onclick="toggleMenu()">Stálá nabídka</a>
+  <a href="#gallery" onclick="toggleMenu()">Galerie</a>
+  <a href="#reviews" onclick="toggleMenu()">Recenze</a>
+  <a href="#info" onclick="toggleMenu()">Kontakt</a>
+</div>
+
+<!-- HERO -->
+<section class="hero" id="hero">
+  <div class="hero-bg" id="heroBg"></div>
+  <div class="hero-overlay"></div>
+  <div class="hero-content">
+    <span class="hero-tag">Restaurant & Coffee · Kopřivnice</span>
+    <h1 class="hero-title">Můj <em>Svět</em></h1>
+    <p class="hero-subtitle">Zažijte chuť, atmosféru & pohodu</p>
+    <div class="hero-divider"></div>
+    <div>
+      <a href="#menu" class="hero-cta filled">Co nabízíme</a>
+      <a href="#info" class="hero-cta">Rezervace & kontakt</a>
+    </div>
+  </div>
+  <div class="hero-scroll">
+    <span>Scrolluj níže</span>
+    <div class="scroll-line"></div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section class="about" id="about">
+  <div class="container">
+    <div class="about-grid">
+      <div class="about-image-wrap reveal">
+        <img class="about-img" src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&q=80" alt="Interiér restaurace Můj Svět">
+        <div class="about-img-accent"></div>
+      </div>
+      <div class="about-text">
+        <span class="section-tag reveal">Naše místo</span>
+        <h2 class="section-title reveal">Místo, kde se <em>čas</em> zastaví</h2>
+        <div class="divider-line reveal"></div>
+        <p class="reveal">Vítejte v Můj Svět – restauraci a kavárně uprostřed Kopřivnice, kde pospolu rostou staré kmeny, svěží bylinky a váš dobrý nálada. Náš interiér s živým stromem a závěsnou zelení vytváří atmosféru, která není ani trošku podobná ničemu jinému ve městě.</p>
+        <p class="reveal">Vaříme z poctivých surovin, s láskou a kreativitou. Ať přijdete na rychlé poledne, romantickou večeři, nebo jen na skvělou kávu – vždy se postaráme, abyste odcházeli s úsměvem.</p>
+        <div class="about-stats reveal">
+          <div class="stat-item">
+            <span class="stat-num">4,4</span>
+            <span class="stat-label">Hodnocení Google</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-num">915</span>
+            <span class="stat-label">Recenzí</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-num">98%</span>
+            <span class="stat-label">Spokojených hostů</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features">
+  <div class="container">
+    <span class="section-tag reveal">Proč k nám přijít</span>
+    <h2 class="section-title reveal">Čím jsme <em>výjimeční</em></h2>
+    <div class="divider-line reveal"></div>
+    <div class="features-grid">
+      <div class="feature-card reveal">
+        <span class="feature-icon">🌿</span>
+        <h3 class="feature-title">Živá atmosféra</h3>
+        <p class="feature-desc">Náš interiér s obrovským živým stromem a závěsnou zelení vás přenese do jiného světa – světa pohody a klidu.</p>
+      </div>
+      <div class="feature-card reveal reveal-delay-1">
+        <span class="feature-icon">🍽️</span>
+        <h3 class="feature-title">Poctivá kuchyně</h3>
+        <p class="feature-desc">Čerstvé suroviny, propracované recepty a vášeň pro vaření. Od polévky po dezert – každé sousto je zážitek.</p>
+      </div>
+      <div class="feature-card reveal reveal-delay-2">
+        <span class="feature-icon">☕</span>
+        <h3 class="feature-title">Skvělá káva</h3>
+        <p class="feature-desc">Espresso, cappuccino, latte – naše baristry připravují každý šálek s péčí a precizností pro váš dokonalý kafíčkový rituál.</p>
+      </div>
+      <div class="feature-card reveal">
+        <span class="feature-icon">🍺</span>
+        <h3 class="feature-title">Výběr piv</h3>
+        <p class="feature-desc">Nabízíme výběr kvalitních čepovaných i lahvových piv pro každého milovníka zlatavého moku.</p>
+      </div>
+      <div class="feature-card reveal reveal-delay-1">
+        <span class="feature-icon">🚗</span>
+        <h3 class="feature-title">Jídlo s sebou</h3>
+        <p class="feature-desc">Nestíháte? Žádný problém. Naše oblíbená jídla si můžete vzít s sebou nebo objednat s donáškou domů.</p>
+      </div>
+      <div class="feature-card reveal reveal-delay-2">
+        <span class="feature-icon">😊</span>
+        <h3 class="feature-title">Milá obsluha</h3>
+        <p class="feature-desc">Naši pracovníci jsou tu pro vás – příjemní, nápomocní a vždy s úsměvem. Váš komfort je naší prioritou.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MENU -->
+<section class="menu-section" id="menu">
+  <div class="container">
+    <div class="menu-header">
+      <span class="section-tag reveal">Naše nabídka</span>
+      <h2 class="section-title reveal">Co <em>nabízíme</em></h2>
+      <div class="divider-line reveal"></div>
+      <p class="reveal" style="font-family:'Cormorant Garamond',serif;font-size:1.1rem;color:var(--moss);max-width:550px;margin:0 auto;">Vyberte si z naší bohaté nabídky pokrmů a nápojů. Ceny jsou přibližné, aktuální nabídku poledního menu naleznete přímo v restauraci.</p>
+    </div>
+
+    <div class="menu-tabs reveal">
+      <button class="tab-btn active" onclick="showTab('polevky')">Polévky</button>
+      <button class="tab-btn" onclick="showTab('predkrmy')">Předkrmy & Saláty</button>
+      <button class="tab-btn" onclick="showTab('hlavni')">Hlavní jídla</button>
+      <button class="tab-btn" onclick="showTab('burgery')">Burgery & Sendviče</button>
+      <button class="tab-btn" onclick="showTab('testoviny')">Těstoviny & Rizoto</button>
+      <button class="tab-btn" onclick="showTab('dezerty')">Dezerty</button>
+      <button class="tab-btn" onclick="showTab('kava')">Káva & Nápoje</button>
+    </div>
+
+    <!-- POLÉVKY -->
+    <div class="menu-panel active" id="tab-polevky">
+      <div class="menu-items">
+        <h3 class="menu-category-title"><em>Polévky</em></h3>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Polévka dne</span>
+            <span class="item-desc">Čerstvě připravená každý den – ptejte se obsluhy</span>
+          </div>
+          <span class="item-price">49 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Hovězí vývar s nudlemi</span>
+            <span class="item-desc">Domácí vývar, zelenina, vejce, čerstvé bylinky</span>
+          </div>
+          <span class="item-price">75 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Krémová česnečka</span>
+            <span class="item-desc">Pečený česnek, smetana, krutóny, parmezán</span>
+          </div>
+          <span class="item-price">79 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Gulášová polévka</span>
+            <span class="item-desc">Hovězí maso, paprika, cibule, kmín, chléb</span>
+          </div>
+          <span class="item-price">89 Kč</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- PŘEDKRMY -->
+    <div class="menu-panel" id="tab-predkrmy">
+      <div class="menu-items">
+        <h3 class="menu-category-title"><em>Předkrmy</em> & Saláty</h3>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Míchaný salát</span>
+            <span class="item-desc">Čerstvá zelenina, cherry rajčata, okurka, italská zálivka</span>
+          </div>
+          <span class="item-price">139 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Salát s grilovaným kuřetem</span>
+            <span class="item-desc">Rukola, grilované kuřecí prso, parmazán, cherry rajčata, citronová zálivka</span>
+          </div>
+          <span class="item-price">189 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Grilovaný hermelín v slanině</span>
+            <span class="item-desc">Hermelín zabalený ve slanině, pečivo, česnekový dip, čerstvá zelenina</span>
+          </div>
+          <span class="item-price">165 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Bruschetta</span>
+            <span class="item-desc">Opečený chléb, rajčata, bazalka, česnek, olivový olej, parmezán</span>
+          </div>
+          <span class="item-price">99 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Tatarský biftek</span>
+            <span class="item-desc">Čerstvé hovězí, kapary, šalotka, topinky, vajíčko</span>
+          </div>
+          <span class="item-price">229 Kč</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- HLAVNÍ JÍDLA -->
+    <div class="menu-panel" id="tab-hlavni">
+      <div class="menu-items">
+        <h3 class="menu-category-title"><em>Hlavní</em> jídla</h3>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Grilovaný losos</span>
+            <span class="item-desc">Filet lososa, citronové máslo, bylinky, sezónní zelenina, brambory</span>
+          </div>
+          <span class="item-price">295 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Kuřecí prso na bylinkách</span>
+            <span class="item-desc">Grilované kuřecí prso, medová zelenina, pečené brambory</span>
+          </div>
+          <span class="item-price">249 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Svíčková na smetaně</span>
+            <span class="item-desc">Hovězí svíčková, smetanová omáčka, knedlíky, brusinky, šlehačka</span>
+          </div>
+          <span class="item-price">275 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Vepřová panenka</span>
+            <span class="item-desc">Vepřová panenka, demi-glace, špenát, gratinované brambory</span>
+          </div>
+          <span class="item-price">285 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Grilovaný T-bone steak</span>
+            <span class="item-desc">300g grilovaný steak, pečené brambory, sezónní zelenina, bylinková máslo</span>
+          </div>
+          <span class="item-price">450 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Vegetariánský talíř</span>
+            <span class="item-desc">Grilovaná zelenina, hummus, falafel, pita chléb, tzatziki</span>
+          </div>
+          <span class="item-price">225 Kč</span>
+        </div>
+      </div>
+      <p class="menu-note">* Všechna hlavní jídla jsou podávána s přílohou dle výběru: hranolky, pečené brambory, rýže nebo salát.</p>
+    </div>
+
+    <!-- BURGERY -->
+    <div class="menu-panel" id="tab-burgery">
+      <div class="menu-items">
+        <h3 class="menu-category-title"><em>Burgery</em> & Sendviče</h3>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Klasický burger</span>
+            <span class="item-desc">Hovězí patty 180g, cheddar, ledový salát, rajče, okurka, BBQ omáčka, briošková žemle</span>
+          </div>
+          <span class="item-price">219 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Slanina burger</span>
+            <span class="item-desc">Hovězí patty 180g, cheddar, slanina, karamelizovaná cibule, BBQ omáčka</span>
+          </div>
+          <span class="item-price">239 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Kuřecí crispy burger</span>
+            <span class="item-desc">Obalované kuřecí prso, salát, rajče, medová hořčice, žemle</span>
+          </div>
+          <span class="item-price">209 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Club sendvič</span>
+            <span class="item-desc">Toastový chléb, kuřecí prso, slanina, vejce, salát, rajče, majonéza</span>
+          </div>
+          <span class="item-price">189 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Veggie burger</span>
+            <span class="item-desc">Černobeznový patty, avokádo, salát, rajče, jogurtová omáčka</span>
+          </div>
+          <span class="item-price">199 Kč</span>
+        </div>
+      </div>
+      <p class="menu-note">* Všechny burgery jsou podávány s hranolky nebo salátem.</p>
+    </div>
+
+    <!-- TĚSTOVINY -->
+    <div class="menu-panel" id="tab-testoviny">
+      <div class="menu-items">
+        <h3 class="menu-category-title"><em>Těstoviny</em> & Rizoto</h3>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Spaghetti Carbonara</span>
+            <span class="item-desc">Spaghetti, slanina, žloutek, parmezán, černý pepř</span>
+          </div>
+          <span class="item-price">199 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Penne Arrabiata</span>
+            <span class="item-desc">Penne, pikantní rajčatová omáčka, česnek, bazalka, chilli</span>
+          </div>
+          <span class="item-price">179 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Tagliatelle se lososem</span>
+            <span class="item-desc">Tagliatelle, grilovaný losos, smetanová omáčka, kapary, kopr</span>
+          </div>
+          <span class="item-price">229 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Gnocchi s houbami</span>
+            <span class="item-desc">Domácí gnocchi, lesní houby, smetana, tymián, parmezán</span>
+          </div>
+          <span class="item-price">209 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Kuřecí rizoto</span>
+            <span class="item-desc">Arborio rýže, kuřecí prso, parmazán, bílé víno, máslo, šafrán</span>
+          </div>
+          <span class="item-price">219 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Houbové rizoto (V)</span>
+            <span class="item-desc">Arborio rýže, smíšené houby, tymián, parmezán, truffle oil</span>
+          </div>
+          <span class="item-price">205 Kč</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEZERTY -->
+    <div class="menu-panel" id="tab-dezerty">
+      <div class="menu-items">
+        <h3 class="menu-category-title"><em>Dezerty</em></h3>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Lívanečky s džemem</span>
+            <span class="item-desc">Domácí lívanečky, čerstvý džem, šlehačka, moučkový cukr</span>
+          </div>
+          <span class="item-price">129 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Parfait</span>
+            <span class="item-desc">Zmrzlinový parfait, čokoládová poleva, ovoce, oříšky</span>
+          </div>
+          <span class="item-price">145 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Čokoládový lávový koláč</span>
+            <span class="item-desc">Teplý čokoládový koláč s tekutým středem, vanilková zmrzlina</span>
+          </div>
+          <span class="item-price">155 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Cheesecake</span>
+            <span class="item-desc">New York cheesecake, lesní ovoce, máta</span>
+          </div>
+          <span class="item-price">135 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Tiramisu</span>
+            <span class="item-desc">Klasické italské tiramisu, kakaový prášek, espresso</span>
+          </div>
+          <span class="item-price">139 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left">
+            <span class="item-name">Ovocný pohár</span>
+            <span class="item-desc">Čerstvé sezónní ovoce, jogurt, granola, med</span>
+          </div>
+          <span class="item-price">119 Kč</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- KÁVA & NÁPOJE -->
+    <div class="menu-panel" id="tab-kava">
+      <div class="menu-items">
+        <h3 class="menu-category-title"><em>Káva</em></h3>
+        <div class="menu-item">
+          <div class="item-left"><span class="item-name">Espresso</span><span class="item-desc">Silné, aromatické espresso</span></div>
+          <span class="item-price">55 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left"><span class="item-name">Dvojité espresso</span></div>
+          <span class="item-price">69 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left"><span class="item-name">Cappuccino</span><span class="item-desc">Espresso, napěněné mléko, jemná pěna</span></div>
+          <span class="item-price">69 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left"><span class="item-name">Latte</span><span class="item-desc">Espresso s velkým množstvím napěněného mléka</span></div>
+          <span class="item-price">75 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left"><span class="item-name">Flat White</span><span class="item-desc">Silnější espresso, jemnější pěna</span></div>
+          <span class="item-price">75 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left"><span class="item-name">Vídeňská káva</span><span class="item-desc">Espresso, šlehačka, vanilkový cukr</span></div>
+          <span class="item-price">85 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left"><span class="item-name">Ledová káva</span><span class="item-desc">Espresso, led, mléko nebo smetana dle výběru</span></div>
+          <span class="item-price">89 Kč</span>
+        </div>
+      </div>
+      <div class="menu-items">
+        <h3 class="menu-category-title"><em>Nápoje</em></h3>
+        <div class="menu-item">
+          <div class="item-left"><span class="item-name">Čaj výběrový</span><span class="item-desc">Výběr z mnoha druhů, konvička 0,5 l</span></div>
+          <span class="item-price">59 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left"><span class="item-name">Domácí limonáda</span><span class="item-desc">Citron, máta, perlivá voda, cukr (0,4 l)</span></div>
+          <span class="item-price">79 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left"><span class="item-name">Minerální voda</span><span class="item-desc">Perlivá / Neperlivá (0,33 l)</span></div>
+          <span class="item-price">39 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left"><span class="item-name">Čepované pivo (0,5 l)</span><span class="item-desc">Ptejte se obsluhy – aktuální nabídka</span></div>
+          <span class="item-price">od 55 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left"><span class="item-name">Nealkoholické pivo</span></div>
+          <span class="item-price">49 Kč</span>
+        </div>
+        <div class="menu-item">
+          <div class="item-left"><span class="item-name">Víno (sklenička)</span><span class="item-desc">Bílé / Červené / Rosé – ptejte se na výběr dne</span></div>
+          <span class="item-price">od 79 Kč</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- DAILY MENU (dynamic from admin) -->
+<section class="daily-menu" id="daily-menu">
+  <div class="container">
+    <span class="section-tag reveal">Aktuálně tento týden</span>
+    <h2 class="section-title reveal">Denní <em>menu</em></h2>
+    <div class="divider-line reveal"></div>
+    <p class="reveal" style="font-family:'Cormorant Garamond',serif;font-size:1.1rem;color:rgba(245,240,232,0.6);max-width:560px;">
+      Každý týden čerstvě připravená nabídka polévek, hlavních jídel a dezertů za příznivé ceny. Nabídka se mění, sledujte aktuální novinky!
+    </p>
+
+    <div class="daily-day-tabs" id="dailyDayTabs">
+      <!-- filled by JS -->
+    </div>
+
+    <div id="dailyContent">
+      <div class="daily-loading">⏳ Načítám denní menu...</div>
+    </div>
+  </div>
+</section>
+
+<!-- GALLERY -->
+<section class="gallery" id="gallery">
+  <div class="container">
+    <span class="section-tag reveal">Atmosféra</span>
+    <h2 class="section-title reveal">Nahlédněte <em>dovnitř</em></h2>
+    <div class="divider-line reveal"></div>
+  </div>
+  <div class="container">
+    <div class="gallery-grid reveal">
+      <div class="gallery-item">
+        <img src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=900&q=80" alt="Interiér restaurace">
+        <div class="gallery-overlay"></div>
+      </div>
+      <div class="gallery-item">
+        <img src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80" alt="Jídlo v restauraci">
+        <div class="gallery-overlay"></div>
+      </div>
+      <div class="gallery-item">
+        <img src="https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600&q=80" alt="Káva">
+        <div class="gallery-overlay"></div>
+      </div>
+      <div class="gallery-item">
+        <img src="https://images.unsplash.com/photo-1571997478779-2adcbbe9ab2f?w=600&q=80" alt="Stůl v restauraci">
+        <div class="gallery-overlay"></div>
+      </div>
+      <div class="gallery-item">
+        <img src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&q=80" alt="Dezert">
+        <div class="gallery-overlay"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- REVIEWS -->
+<section class="reviews" id="reviews">
+  <div class="container">
+    <span class="section-tag reveal">Co říkají hosté</span>
+    <h2 class="section-title reveal">Naše <em>recenze</em></h2>
+    <div class="divider-line reveal"></div>
+    <div class="reviews-grid">
+      <div class="review-card reveal">
+        <div class="stars">★★★★★</div>
+        <p class="review-text">„Dnes jsme zde zavítali asi po 2 letech. Byli jsme příjemně překvapení velmi dobrým jídlem – grilovaný hermelín v slanině byl fantastický a atmosféra jako vždy úžasná."</p>
+        <span class="review-author">Pepina Na Cestách · Místní průvodce</span>
+      </div>
+      <div class="review-card reveal reveal-delay-1">
+        <div class="stars">★★★★★</div>
+        <p class="review-text">„Doporučuji zajít – jídlo je bomba. Měl jsem lososa, který vypadal jak z michelinské restaurace. Obsluha byla příjemná a atmosféra moc pěkná."</p>
+        <span class="review-author">Šestý Kolak Karel · Místní průvodce</span>
+      </div>
+      <div class="review-card review-rating-big reveal reveal-delay-2">
+        <span class="rating-num">4,4</span>
+        <div class="stars" style="font-size:1.3rem;margin:0.8rem 0 0.5rem;">★★★★☆</div>
+        <span class="rating-label">Z 915 recenzí na Google</span>
+      </div>
+      <div class="review-card reveal">
+        <div class="stars">★★★★★</div>
+        <p class="review-text">„V týdnu v poledne prázdno, což je škoda, protože jídlo je skvělé a obsluha moc příjemná. Aspoň nebylo třeba čekat na jídlo."</p>
+        <span class="review-author">Dominik Mazel · Místní průvodce</span>
+      </div>
+      <div class="review-card reveal reveal-delay-1">
+        <div class="stars">★★★★★</div>
+        <p class="review-text">„Obsluha příjemná, jídlo výborné, dezert vynikající – lívanečky byly to nejlepší! Určitě se vrátím."</p>
+        <span class="review-author">Ověřený host Google</span>
+      </div>
+      <div class="review-card reveal reveal-delay-2">
+        <div class="stars">★★★★☆</div>
+        <p class="review-text">„Krásný prostor, příjemná obsluha a dobrá káva. Interiér se stromem je opravdu jedinečný. Lehce vyšší ceny, ale kvalita tomu odpovídá."</p>
+        <span class="review-author">Ověřený host Google</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- INFO / CONTACT -->
+<section class="info-section" id="info">
+  <div class="container">
+    <div class="info-grid">
+      <div>
+        <span class="section-tag reveal">Navštivte nás</span>
+        <h2 class="section-title reveal">Kde <em>nás najdete</em></h2>
+        <div class="divider-line reveal"></div>
+
+        <div class="info-row reveal">
+          <span class="info-icon">📍</span>
+          <div class="info-row-text">
+            <div class="info-row-label">Adresa</div>
+            Záhumenní 1477/4c<br>742 21 Kopřivnice 1
+          </div>
+        </div>
+        <div class="info-row reveal">
+          <span class="info-icon">📞</span>
+          <div class="info-row-text">
+            <div class="info-row-label">Telefon</div>
+            <a href="tel:+420733242045" style="color:var(--bark);text-decoration:none;">733 242 045</a>
+          </div>
+        </div>
+        <div class="info-row reveal">
+          <span class="info-icon">💰</span>
+          <div class="info-row-text">
+            <div class="info-row-label">Průměrná útrata</div>
+            200–300 Kč na osobu
+          </div>
+        </div>
+        <div class="info-row reveal">
+          <span class="info-icon">🛵</span>
+          <div class="info-row-text">
+            <div class="info-row-label">Způsob podávání</div>
+            Jídlo na místě · Jídlo s sebou · Donáška
+          </div>
+        </div>
+
+        <iframe
+          class="map-embed reveal"
+          src="https://maps.google.com/maps?q=Z%C3%A1humen%C3%AD+1477%2F4c%2C+742+21+Kop%C5%99ivnice&output=embed"
+          allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade">
+        </iframe>
+      </div>
+
+      <div>
+        <span class="section-tag reveal">Otevírací doby</span>
+        <h3 class="info-block reveal" style="font-family:'Playfair Display',serif;font-size:1.8rem;color:var(--dark-bark);margin-bottom:1.5rem;">Kdy <em>jsme otevřeni</em></h3>
+        <div class="divider-line reveal"></div>
+
+        <div style="margin-bottom:2rem;">
+          <div class="menu-item reveal">
+            <span style="color:var(--moss);font-size:0.9rem;">Pondělí – Pátek</span>
+            <span style="color:var(--text-body);font-size:0.9rem;">11:00 – 21:00</span>
+          </div>
+          <div class="menu-item reveal">
+            <span style="color:var(--moss);font-size:0.9rem;">Sobota</span>
+            <span style="color:var(--text-body);font-size:0.9rem;">11:00 – 22:00</span>
+          </div>
+          <div class="menu-item reveal">
+            <span style="color:var(--moss);font-size:0.9rem;">Neděle</span>
+            <span style="color:var(--text-body);font-size:0.9rem;">11:00 – 20:00</span>
+          </div>
+        </div>
+
+        <div class="reveal" style="background:var(--dark-bark);padding:2.5rem;margin-top:1.5rem;">
+          <h4 style="font-family:'Playfair Display',serif;font-size:1.4rem;color:var(--gold);margin-bottom:1rem;">Rezervace stolu</h4>
+          <p style="color:rgba(245,240,232,0.7);font-size:0.9rem;line-height:1.7;margin-bottom:1.5rem;">Na rezervaci nás kontaktujte telefonicky nebo přes Facebook. Těšíme se na vaši návštěvu!</p>
+          <a href="tel:+420733242045" class="hero-cta" style="border-color:var(--gold);color:var(--gold);display:inline-flex;text-decoration:none;">
+            📞 Zavolat nám
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <span class="footer-logo">Můj Svět</span>
+  <p class="footer-sub">Restaurant & Coffee · Kopřivnice</p>
+  <ul class="footer-links">
+    <li><a href="#about">O nás</a></li>
+    <li><a href="#menu">Menu</a></li>
+    <li><a href="#gallery">Galerie</a></li>
+    <li><a href="#info">Kontakt</a></li>
+  </ul>
+  <p class="footer-copy">© 2025 Můj Svět Restaurant & Coffee · Záhumenní 1477/4c, Kopřivnice · 733 242 045</p>
+</footer>
+
+<script>
+  // Loader
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      document.getElementById('loader').classList.add('hidden');
+    }, 900);
+  });
+
+  // Navbar scroll
+  window.addEventListener('scroll', () => {
+    const nav = document.getElementById('navbar');
+    nav.classList.toggle('scrolled', window.scrollY > 60);
+  });
+
+  // Parallax hero
+  const heroBg = document.getElementById('heroBg');
+  window.addEventListener('scroll', () => {
+    const scroll = window.scrollY;
+    heroBg.style.transform = `scale(1.05) translateY(${scroll * 0.25}px)`;
+  }, { passive: true });
+
+  // Mobile menu
+  function toggleMenu() {
+    const ham = document.getElementById('hamburger');
+    const menu = document.getElementById('mobileMenu');
+    ham.classList.toggle('active');
+    menu.classList.toggle('open');
+    menu.style.display = menu.classList.contains('open') ? 'flex' : 'none';
+    if (!menu.classList.contains('open')) menu.style.display = 'none';
+  }
+  document.getElementById('mobileMenu').style.display = 'none';
+
+  // Menu tabs
+  function showTab(tabId) {
+    document.querySelectorAll('.menu-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + tabId).classList.add('active');
+    event.target.classList.add('active');
+  }
+
+  // Scroll reveal
+  const revealEls = document.querySelectorAll('.reveal');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12 });
+  revealEls.forEach(el => observer.observe(el));
+
+  // ── DAILY MENU (Supabase) ──
+  // ⚙️ Nastavte stejné hodnoty jako v admin.html
+  const SUPABASE_URL      = 'https://bwjbeouemxmyobraqyhc.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ3amJlb3VlbXhteW9icmFxeWhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NjM5MzgsImV4cCI6MjA5MTMzOTkzOH0.vn8hvO_rp0oOObdGPIgrc1JvKcE4f69Jqvt4ObU_JYU';
+
+  const DAYS_ORDER = ['Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota','Neděle'];
+  const CAT_ORDER  = ['Polévka','Hlavní jídlo','Vegetariánské','Speciál dne','Dezert'];
+  const CAT_CLASS  = {'Polévka':'soup','Hlavní jídlo':'main','Dezert':'dessert','Vegetariánské':'veggie','Speciál dne':'special'};
+  let dailyMeals = [], activeDay = null;
+
+  let sbClient;
+  try { sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch(e) {}
+
+  async function loadDailyMenu() {
+    if (!sbClient || SUPABASE_URL === 'VASE_SUPABASE_URL') {
+      document.getElementById('dailyContent').innerHTML =
+        `<div class="daily-empty"><span class="daily-empty-icon">⚙️</span><span class="daily-empty-text">Supabase není nakonfigurováno.</span></div>`;
+      document.getElementById('dailyDayTabs').innerHTML = '';
+      return;
+    }
+    try {
+      const { data, error } = await sbClient
+        .from('daily_menu')
+        .select('*')
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      dailyMeals = data || [];
+    } catch(e) {
+      dailyMeals = [];
+    }
+    renderDailyMenu();
+  }
+
+  function renderDailyMenu() {
+    const tabsEl = document.getElementById('dailyDayTabs');
+    const contentEl = document.getElementById('dailyContent');
+    const daysWithMeals = DAYS_ORDER.filter(d => dailyMeals.some(m => m.day === d));
+
+    if (dailyMeals.length === 0) {
+      tabsEl.innerHTML = '';
+      contentEl.innerHTML = `<div class="daily-empty"><span class="daily-empty-icon">🍽️</span><span class="daily-empty-text">Denní menu brzy přijde. Sledujte nás!</span></div>`;
+      return;
+    }
+    tabsEl.innerHTML = DAYS_ORDER.map(day => {
+      const count = dailyMeals.filter(m => m.day === day).length;
+      if (!count) return '';
+      const isActive = day === (activeDay || daysWithMeals[0]);
+      return `<button class="daily-day-btn${isActive?' active':''}" onclick="switchDay('${day}',this)">
+        ${day}<span class="meal-count-badge">${count}</span></button>`;
+    }).join('');
+    if (!activeDay || !daysWithMeals.includes(activeDay)) activeDay = daysWithMeals[0];
+    renderDayPanel(activeDay, contentEl);
+  }
+
+  function switchDay(day, btn) {
+    activeDay = day;
+    document.querySelectorAll('.daily-day-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderDayPanel(day, document.getElementById('dailyContent'));
+  }
+
+  function renderDayPanel(day, container) {
+    const dayMeals = [...dailyMeals.filter(m => m.day === day)].sort((a,b) =>
+      CAT_ORDER.indexOf(a.category) - CAT_ORDER.indexOf(b.category));
+    if (!dayMeals.length) {
+      container.innerHTML = `<div class="daily-empty"><span class="daily-empty-icon">🍽️</span><span class="daily-empty-text">Pro tento den není vypsáno menu.</span></div>`;
+      return;
+    }
+    container.innerHTML = `<div class="daily-panel active">${dayMeals.map(m => `
+      <div class="daily-meal-card">
+        <span class="daily-cat-tag ${CAT_CLASS[m.category]||''}">${m.category}</span>
+        <span class="daily-meal-name">${m.name}</span>
+        ${m.description?`<span class="daily-meal-desc">${m.description}</span>`:''}
+        <div class="daily-meal-footer">
+          <span class="daily-meal-price">${m.price} Kč</span>
+          ${m.grams?`<span class="daily-meal-grams">${m.grams}</span>`:''}
+        </div>
+      </div>`).join('')}</div>`;
+  }
+
+  loadDailyMenu();
+  setInterval(loadDailyMenu, 300000);
+</script>
+
+</body>
+</html>

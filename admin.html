@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Můj Svět — Správa menu</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg:#1a110a; --surface:#231610; --surface2:#2d1e14;
+    --border:rgba(200,169,110,.15); --border-h:rgba(200,169,110,.4);
+    --gold:#c8a96e; --gold-l:#e8d5a3; --gold-d:rgba(200,169,110,.35);
+    --cream:#f5f0e8; --moss:#8a9b7a; --rust:#c0673a;
+    --text:#e8ddd0; --text-d:rgba(232,221,208,.5);
+    --ok:#6b9b5c; --err:#c05a4a; --r:4px;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{font-family:'Jost',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+  /* ── CONFIG BANNER ── */
+  #configBanner{
+    background:rgba(192,90,74,.15);border-bottom:1px solid rgba(192,90,74,.4);
+    padding:.8rem 1.5rem;text-align:center;font-size:.85rem;color:#e8a090;
+    display:none;
+  }
+  #configBanner a{color:var(--gold);text-decoration:underline;}
+
+  /* ── LOGIN ── */
+  #loginScreen{
+    min-height:100vh;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at 20% 50%,rgba(200,169,110,.06) 0%,transparent 60%),var(--bg);
+  }
+  .login-card{
+    width:min(420px,92vw);border:1px solid var(--border);background:var(--surface);
+    padding:3rem 2.5rem;position:relative;
+  }
+  .login-card::before{
+    content:'';position:absolute;top:0;left:0;right:0;height:3px;
+    background:linear-gradient(90deg,transparent,var(--gold),transparent);
+  }
+  .login-logo{font-family:'Playfair Display',serif;font-size:2rem;color:var(--gold);text-align:center;display:block;margin-bottom:.3rem}
+  .login-sub{text-align:center;font-size:.75rem;letter-spacing:.25em;text-transform:uppercase;color:var(--text-d);margin-bottom:2.5rem}
+  .form-group{margin-bottom:1.2rem}
+  label{display:block;font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-bottom:.5rem}
+  input[type=text],input[type=email],input[type=password],input[type=number],textarea,select{
+    width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);
+    padding:.75rem 1rem;font-family:'Jost',sans-serif;font-size:.95rem;border-radius:var(--r);outline:none;
+    transition:border-color .3s,background .3s;
+  }
+  input:focus,textarea:focus,select:focus{border-color:var(--gold-d);background:rgba(200,169,110,.06)}
+  textarea{resize:vertical;min-height:70px}
+  select{cursor:pointer} select option{background:#2d1e14}
+
+  .btn{display:inline-flex;align-items:center;gap:.5rem;padding:.8rem 1.8rem;font-family:'Jost',sans-serif;font-size:.82rem;letter-spacing:.18em;text-transform:uppercase;cursor:pointer;border:none;border-radius:var(--r);transition:all .25s;font-weight:500}
+  .btn-gold{background:var(--gold);color:#1a110a} .btn-gold:hover{background:var(--gold-l)}
+  .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text-d)} .btn-outline:hover{border-color:var(--gold-d);color:var(--gold)}
+  .btn-danger{background:transparent;border:1px solid rgba(192,90,74,.3);color:var(--err);padding:.45rem .9rem;font-size:.75rem} .btn-danger:hover{background:rgba(192,90,74,.12)}
+  .btn-full{width:100%;justify-content:center}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+
+  .alert{padding:.75rem 1rem;font-size:.85rem;border-radius:var(--r);margin-top:1rem;display:none}
+  .alert-err{background:rgba(192,90,74,.12);border:1px solid rgba(192,90,74,.3);color:var(--err)}
+  .alert-ok{background:rgba(107,155,92,.12);border:1px solid rgba(107,155,92,.3);color:var(--ok)}
+
+  /* ── ADMIN LAYOUT ── */
+  #adminScreen{display:none}
+  .admin-header{
+    background:var(--surface);border-bottom:1px solid var(--border);padding:1rem 2rem;
+    display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;
+  }
+  .admin-logo{font-family:'Playfair Display',serif;font-size:1.4rem;color:var(--gold)}
+  .admin-logo span{font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--text-d);display:block;margin-top:-2px}
+  .header-right{display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
+  .user-pill{font-size:.75rem;color:var(--text-d);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:.3rem .9rem;border-radius:20px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px var(--ok);display:inline-block;margin-right:.4rem}
+
+  .admin-main{max-width:1060px;margin:0 auto;padding:2.5rem 1.5rem;display:grid;grid-template-columns:1fr 1.7fr;gap:2rem;align-items:start}
+
+  /* ── CARDS ── */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+  .card-header{padding:1.2rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+  .card-title{font-family:'Playfair Display',serif;font-size:1.2rem;color:var(--gold)}
+  .card-body{padding:1.5rem}
+
+  /* ── FORM ── */
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
+
+  /* ── WEEK GRID ── */
+  .week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:.3rem;margin-bottom:1.5rem}
+  .week-cell{background:rgba(255,255,255,.03);border:1px solid var(--border);padding:.6rem .3rem;text-align:center;border-radius:var(--r);cursor:pointer;transition:all .2s}
+  .week-cell:hover{border-color:var(--gold-d)}
+  .week-cell.has{border-color:rgba(200,169,110,.35);background:rgba(200,169,110,.06)}
+  .wc-day{font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-d);display:block}
+  .wc-num{font-size:1.1rem;color:var(--gold);font-family:'Playfair Display',serif;margin-top:.15rem;display:block}
+
+  /* ── FILTER ── */
+  .filter-bar{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:1rem}
+  .f-btn{padding:.4rem .85rem;background:transparent;border:1px solid var(--border);color:var(--text-d);font-family:'Jost',sans-serif;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;border-radius:var(--r);transition:all .2s}
+  .f-btn.active,.f-btn:hover{background:var(--gold);color:#1a110a;border-color:var(--gold)}
+
+  /* ── MEAL ROWS ── */
+  .meals-list{display:flex;flex-direction:column}
+  .meal-row{display:flex;align-items:flex-start;gap:1rem;padding:1rem 1.5rem;border-bottom:1px solid var(--border);transition:background .2s;animation:si .3s ease}
+  @keyframes si{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
+  .meal-row:hover{background:rgba(200,169,110,.04)} .meal-row:last-child{border-bottom:none}
+  .meal-info{flex:1}
+  .mbadge{display:inline-block;font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;color:var(--gold);background:rgba(200,169,110,.1);border:1px solid var(--gold-d);padding:.12rem .45rem;border-radius:2px;margin-bottom:.35rem}
+  .mname{font-size:1rem;color:var(--cream);font-weight:500;display:block;margin-bottom:.15rem}
+  .mdesc{font-size:.8rem;color:var(--text-d);line-height:1.4}
+  .mprice{font-family:'Playfair Display',serif;font-size:1rem;color:var(--gold);white-space:nowrap;flex-shrink:0;margin-top:.15rem}
+
+  .empty-state{padding:3rem 1.5rem;text-align:center;color:var(--text-d);font-size:.9rem}
+  .empty-icon{font-size:2.5rem;margin-bottom:.8rem;display:block;opacity:.35}
+  .spinner{text-align:center;padding:2.5rem;color:var(--text-d);font-size:.85rem;letter-spacing:.1em}
+
+  /* ── TOAST ── */
+  .toast{position:fixed;bottom:2rem;right:2rem;background:var(--surface2);border:1px solid var(--gold-d);color:var(--gold);padding:.9rem 1.5rem;font-size:.85rem;border-radius:var(--r);z-index:9999;transform:translateY(20px);opacity:0;transition:all .35s;pointer-events:none;max-width:300px}
+  .toast.show{transform:translateY(0);opacity:1}
+
+  /* ── CONFIRM ── */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:200}
+  .confirm-box{background:var(--surface);border:1px solid var(--border);padding:2rem;max-width:360px;width:90%;border-radius:var(--r)}
+  .confirm-box h3{font-family:'Playfair Display',serif;color:var(--err);margin-bottom:.8rem}
+  .confirm-box p{font-size:.88rem;color:var(--text-d);margin-bottom:1.5rem;line-height:1.6}
+  .confirm-actions{display:flex;gap:.8rem}
+
+  @media(max-width:700px){
+    .admin-main{grid-template-columns:1fr}
+    .form-row{grid-template-columns:1fr}
+    .week-grid{grid-template-columns:repeat(4,1fr)}
+    .admin-header{padding:1rem;flex-wrap:wrap;gap:.5rem}
+    .header-right{gap:.5rem}
+  }
+</style>
+</head>
+<body>
+
+<!-- CONFIG WARNING (shown if keys not set) -->
+<div id="configBanner">
+  ⚠️ Nejsou nastaveny Supabase klíče. Otevřete soubor <code>admin.html</code> a vyplňte
+  <strong>SUPABASE_URL</strong> a <strong>SUPABASE_ANON_KEY</strong>.
+  <a href="SETUP.md" target="_blank">Návod zde →</a>
+</div>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-card">
+    <span class="login-logo">Můj Svět</span>
+    <p class="login-sub">Správa menu · Přihlášení</p>
+    <div class="form-group">
+      <label>E-mail</label>
+      <input type="email" id="loginEmail" placeholder="admin@mujsvet.cz" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label>Heslo</label>
+      <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn btn-gold btn-full" id="loginBtn" onclick="doLogin()">Přihlásit se</button>
+    <div class="alert alert-err" id="loginErr"></div>
+    <p style="font-size:.72rem;color:var(--text-d);text-align:center;margin-top:1.5rem;line-height:1.6">
+      Přihlášení přes Supabase Auth.<br>Heslo se nastavuje v Supabase dashboardu.
+    </p>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div id="adminScreen">
+  <header class="admin-header">
+    <div class="admin-logo">Správa menu<span>Můj Svět Restaurant & Coffee</span></div>
+    <div class="header-right">
+      <span class="user-pill"><span class="dot"></span><span id="userEmail">—</span></span>
+      <a href="index.html" target="_blank" class="btn btn-outline" style="padding:.5rem 1rem;font-size:.72rem">🌐 Web</a>
+      <button class="btn btn-outline" style="padding:.5rem 1rem;font-size:.72rem" onclick="doLogout()">Odhlásit</button>
+    </div>
+  </header>
+
+  <main class="admin-main">
+    <!-- LEFT: form -->
+    <div style="display:flex;flex-direction:column;gap:1.2rem">
+      <div class="card">
+        <div class="card-header"><h2 class="card-title">Přidat jídlo</h2></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label>Den v týdnu</label>
+            <select id="fDay">
+              <option>Pondělí</option><option>Úterý</option><option>Středa</option>
+              <option>Čtvrtek</option><option>Pátek</option><option>Sobota</option><option>Neděle</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Kategorie</label>
+            <select id="fCat">
+              <option>Polévka</option><option>Hlavní jídlo</option>
+              <option>Vegetariánské</option><option>Speciál dne</option><option>Dezert</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Název jídla *</label>
+            <input type="text" id="fName" placeholder="např. Svíčková na smetaně">
+          </div>
+          <div class="form-group">
+            <label>Popis / složení</label>
+            <textarea id="fDesc" placeholder="např. Hovězí, knedlíky, brusinky..."></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Cena (Kč) *</label>
+              <input type="number" id="fPrice" placeholder="149" min="1">
+            </div>
+            <div class="form-group">
+              <label>Gramáž</label>
+              <input type="text" id="fGrams" placeholder="150/250g">
+            </div>
+          </div>
+          <button class="btn btn-gold btn-full" id="addBtn" onclick="addMeal()">➕ Přidat jídlo</button>
+          <div class="alert alert-err" id="addErr"></div>
+          <div class="alert alert-ok" id="addOk"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2 class="card-title">Rychlé akce</h2></div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:.7rem">
+          <button class="btn btn-outline btn-full" onclick="clearDay()">🗑️ Smazat vybraný den</button>
+          <button class="btn btn-full" style="background:transparent;border:1px solid rgba(192,90,74,.3);color:var(--err);justify-content:center;letter-spacing:.12em;font-size:.8rem;text-transform:uppercase;padding:.8rem" onclick="showConfirm()">🗑️ Smazat celý týden</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: list -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Týdenní přehled</h2>
+        <span id="totalLbl" style="font-size:.8rem;color:var(--text-d)">0 jídel</span>
+      </div>
+      <div class="card-body" style="padding-bottom:.5rem">
+        <div class="week-grid" id="weekGrid"></div>
+        <div class="filter-bar">
+          <span style="font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-d);align-self:center">Filtr:</span>
+          <button class="f-btn active" data-day="all" onclick="setFilter('all',this)">Vše</button>
+          <button class="f-btn" data-day="Pondělí" onclick="setFilter('Pondělí',this)">Po</button>
+          <button class="f-btn" data-day="Úterý" onclick="setFilter('Úterý',this)">Út</button>
+          <button class="f-btn" data-day="Středa" onclick="setFilter('Středa',this)">St</button>
+          <button class="f-btn" data-day="Čtvrtek" onclick="setFilter('Čtvrtek',this)">Čt</button>
+          <button class="f-btn" data-day="Pátek" onclick="setFilter('Pátek',this)">Pá</button>
+          <button class="f-btn" data-day="Sobota" onclick="setFilter('Sobota',this)">So</button>
+          <button class="f-btn" data-day="Neděle" onclick="setFilter('Neděle',this)">Ne</button>
+        </div>
+      </div>
+      <div class="meals-list" id="mealsList">
+        <div class="spinner">⏳ Načítám...</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- CONFIRM OVERLAY -->
+<div class="overlay" id="confirmOverlay" style="display:none">
+  <div class="confirm-box">
+    <h3>Smazat celý týden?</h3>
+    <p>Odstraní všechna jídla z databáze. Tato akce je nevratná.</p>
+    <div class="confirm-actions">
+      <button class="btn btn-danger" onclick="clearWeek()">Ano, smazat vše</button>
+      <button class="btn btn-outline" onclick="hideConfirm()">Zrušit</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+
+const SUPABASE_URL      = 'https://bwjbeouemxmyobraqyhc.supabase.co';       
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ3amJlb3VlbXhteW9icmFxeWhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NjM5MzgsImV4cCI6MjA5MTMzOTkzOH0.vn8hvO_rp0oOObdGPIgrc1JvKcE4f69Jqvt4ObU_JYU';  // anon/public klíč
+
+// ══════════════════════════════════════════════
+const DAYS = ['Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota','Neděle'];
+const DAYS_SHORT = ['Po','Út','St','Čt','Pá','So','Ne'];
+const CAT_ORDER = ['Polévka','Hlavní jídlo','Vegetariánské','Speciál dne','Dezert'];
+
+let sb, meals = [], filter = 'all';
+
+// Check config
+if (SUPABASE_URL === 'VASE_SUPABASE_URL') {
+  document.getElementById('configBanner').style.display = 'block';
+}
+
+// Init Supabase
+try {
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} catch(e) {
+  console.error('Supabase init failed', e);
+}
+
+// ── AUTH ──────────────────────────────────────
+async function doLogin() {
+  const btn = document.getElementById('loginBtn');
+  const errEl = document.getElementById('loginErr');
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPass').value;
+  errEl.style.display = 'none';
+  btn.disabled = true; btn.textContent = 'Přihlašuji...';
+
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+    if (error) throw error;
+    onLogin(data.user);
+  } catch(e) {
+    errEl.textContent = 'Chyba přihlášení: ' + (e.message || 'Nesprávný e-mail nebo heslo.');
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Přihlásit se';
+  }
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+  document.getElementById('adminScreen').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+}
+
+function onLogin(user) {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('adminScreen').style.display = 'block';
+  document.getElementById('userEmail').textContent = user.email;
+  loadMeals();
+}
+
+// Auto-restore session
+window.addEventListener('DOMContentLoaded', async () => {
+  if (!sb) return;
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session?.user) onLogin(session.user);
+  } catch(e) {}
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('loginScreen').style.display !== 'none') doLogin();
+});
+
+// ── CRUD ──────────────────────────────────────
+async function loadMeals() {
+  try {
+    const { data, error } = await sb
+      .from('daily_menu')
+      .select('*')
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    meals = data || [];
+    renderAll();
+  } catch(e) {
+    toast('⚠ Chyba načtení: ' + e.message, true);
+  }
+}
+
+async function addMeal() {
+  const btn = document.getElementById('addBtn');
+  const errEl = document.getElementById('addErr');
+  const okEl  = document.getElementById('addOk');
+  errEl.style.display = 'none'; okEl.style.display = 'none';
+
+  const name  = document.getElementById('fName').value.trim();
+  const price = parseInt(document.getElementById('fPrice').value);
+  if (!name)       { errEl.textContent = 'Vyplňte název jídla.'; errEl.style.display='block'; return; }
+  if (!price || price < 1) { errEl.textContent = 'Vyplňte platnou cenu.'; errEl.style.display='block'; return; }
+
+  btn.disabled = true; btn.textContent = 'Ukládám...';
+  try {
+    const { data, error } = await sb.from('daily_menu').insert([{
+      day:         document.getElementById('fDay').value,
+      category:    document.getElementById('fCat').value,
+      name,
+      description: document.getElementById('fDesc').value.trim() || null,
+      price,
+      grams:       document.getElementById('fGrams').value.trim() || null,
+    }]).select();
+    if (error) throw error;
+    meals.push(data[0]);
+    renderAll();
+    // Reset
+    ['fName','fDesc','fPrice','fGrams'].forEach(id => document.getElementById(id).value = '');
+    okEl.textContent = '✓ Jídlo přidáno a zobrazeno na webu.'; okEl.style.display = 'block';
+    setTimeout(() => okEl.style.display='none', 3000);
+  } catch(e) {
+    errEl.textContent = 'Chyba uložení: ' + e.message; errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = '➕ Přidat jídlo';
+  }
+}
+
+async function deleteMeal(id) {
+  try {
+    const { error } = await sb.from('daily_menu').delete().eq('id', id);
+    if (error) throw error;
+    meals = meals.filter(m => m.id !== id);
+    renderAll();
+    toast('✓ Jídlo smazáno');
+  } catch(e) { toast('⚠ Chyba mazání: ' + e.message, true); }
+}
+
+async function clearDay() {
+  const day = document.getElementById('fDay').value;
+  const ids = meals.filter(m => m.day === day).map(m => m.id);
+  if (!ids.length) { toast('Pro tento den nejsou žádná jídla.'); return; }
+  try {
+    const { error } = await sb.from('daily_menu').delete().in('id', ids);
+    if (error) throw error;
+    meals = meals.filter(m => m.day !== day);
+    renderAll();
+    toast(`✓ Smazáno ${ids.length} jídel z ${day}`);
+  } catch(e) { toast('⚠ ' + e.message, true); }
+}
+
+async function clearWeek() {
+  hideConfirm();
+  try {
+    const { error } = await sb.from('daily_menu').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (error) throw error;
+    meals = [];
+    renderAll();
+    toast('✓ Celý týden smazán');
+  } catch(e) { toast('⚠ ' + e.message, true); }
+}
+
+// ── FILTER & RENDER ───────────────────────────
+function setFilter(day, btn) {
+  filter = day;
+  document.querySelectorAll('.f-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderList();
+}
+
+function renderAll() { renderWeekGrid(); renderList(); document.getElementById('totalLbl').textContent = meals.length + ' jídel'; }
+
+function renderWeekGrid() {
+  document.getElementById('weekGrid').innerHTML = DAYS.map((day, i) => {
+    const n = meals.filter(m => m.day === day).length;
+    return `<div class="week-cell ${n?'has':''}" onclick="setFilter('${day}', document.querySelectorAll('.f-btn')[${i+1}])">
+      <span class="wc-day">${DAYS_SHORT[i]}</span>
+      <span class="wc-num">${n}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderList() {
+  const list = document.getElementById('mealsList');
+  let data = filter === 'all' ? meals : meals.filter(m => m.day === filter);
+  data = [...data].sort((a,b) => {
+    const dd = DAYS.indexOf(a.day) - DAYS.indexOf(b.day);
+    return dd !== 0 ? dd : CAT_ORDER.indexOf(a.category) - CAT_ORDER.indexOf(b.category);
+  });
+  if (!data.length) {
+    list.innerHTML = `<div class="empty-state"><span class="empty-icon">🍽️</span>Žádná jídla. Přidejte první jídlo vlevo.</div>`;
+    return;
+  }
+  list.innerHTML = data.map(m => `
+    <div class="meal-row">
+      <div class="meal-info">
+        <span class="mbadge">${m.day} · ${m.category}</span>
+        <span class="mname">${m.name}${m.grams?` <small style="color:var(--text-d);font-weight:300">${m.grams}</small>`:''}</span>
+        ${m.description?`<span class="mdesc">${m.description}</span>`:''}
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.5rem;flex-shrink:0">
+        <span class="mprice">${m.price} Kč</span>
+        <button class="btn btn-danger" onclick="deleteMeal('${m.id}')">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+// ── UI HELPERS ────────────────────────────────
+function showConfirm() { document.getElementById('confirmOverlay').style.display = 'flex'; }
+function hideConfirm() { document.getElementById('confirmOverlay').style.display = 'none'; }
+function toast(msg, err=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.borderColor = err ? 'rgba(192,90,74,.4)' : 'rgba(200,169,110,.4)';
+  t.style.color = err ? 'var(--err)' : 'var(--gold)';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+</script>
+</body>
+</html>
